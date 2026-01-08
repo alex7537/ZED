@@ -1,5 +1,6 @@
 # ZED
 zwei RGB 
+zed-rgb.py
 
 cp /home/match/ZED/zed_capture/K_rgb_fs.txt /home/match/FS/FoundationStereo/shared_fs_test/
 cp /home/match/ZED/zed_capture/left_000004.png /home/match/FS/FoundationStereo/shared_fs_test/
