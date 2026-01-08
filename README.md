@@ -1,5 +1,5 @@
 # ZED
-zwei RGB /
+zwei RGB \
 python zed-rgb.py
 
 cp /home/match/ZED/zed_capture/K_rgb_fs.txt /home/match/FS/FoundationStereo/shared_fs_test/
