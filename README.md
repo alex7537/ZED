@@ -90,14 +90,14 @@ Ziel ist es, **FoundationStereo als Ersatz für native RealSense-Tiefendaten** i
 
 ```
 .
-├── realsense_ir_capture_v2.py
+├── realsense_IR_v1.py
 │   └─ Capture IR stereo + color + intrinsics/extrinsics
 │
 ├── FoundationStereo/
 │   └─ scripts/run_demo.py
 │      └─ IR stereo → depth_meter.npy
 │
-├── fs_ir_depth_to_color_depth_v2.py
+├── IR_farben.py
 │   └─ Project FS depth → color image plane
 │
 └── shared_fs_test/
@@ -105,8 +105,8 @@ Ziel ist es, **FoundationStereo als Ersatz für native RealSense-Tiefendaten** i
     ├── ir_right_0000.png
     ├── color_aligned_0000.png
     ├── depth_fs_ir2color_aligned_0000.png
-    ├── *_intrinsics.json
-    └── *_extrinsics.json
+    ├── color_aligned_intrinsics.json
+    
 ```
 
 ---
