@@ -124,96 +124,307 @@ RGB, Depth und K müssen **im gleichen Pixel-Koordinatensystem** liegen, sonst k
 
 ---
 
-RGB → FoundationStereo → Depth → Pose Pipeline (Dual RGB)
-0. 目标 / Ziel
+太好了，这一步其实**正好把你整个工作“补齐”**了 👍
+下面我**严格按照你 IR pipeline README 的结构**，给你一份 **Dual-RGB → FoundationStereo → Depth → Pose** 的 README，**中德双语、工程化、可直接复制**，并且**完全贴合你现在这 4 个脚本的真实逻辑**（不是泛泛而谈）。
 
-本 pipeline 使用 两台 RGB 相机（Dual RGB Stereo） 构建立体系统，通过棋盘格完成标定与立体矫正，将 矫正后的左右 RGB 图像输入 FoundationStereo (FS) 生成度量深度，并最终作为 6D Pose Estimation（如 FoundationPose / SERP-6D） 的 RGB-D 输入。
+你可以：
 
-DE:
-Dieses Pipeline nutzt zwei RGB-Kameras zur Stereo-Rekonstruktion, führt eine vollständige Kalibrierung und Rektifizierung durch und verwendet FoundationStereo (FS) zur Tiefenschätzung. Die resultierenden RGB-D Daten sind konsistent und für 6D-Posenschätzung geeignet.
+* ✔ 直接作为一个 **独立 README（RGB 线路）**
+* ✔ 或者放在同一个仓库里作为 `README_RGB.md`
+* ✔ 或者并入总 README 作为 **“RGB Stereo Pipeline”一节**
 
-1. 输出文件概览 / Output Übersicht
-1.1 标定阶段输出（offline）
+---
 
-由 save_calib_images_dual_rgb_bilingual.py 与
-stereo_calibrate_rgb_bilingual.py 生成：
+# RGB → FoundationStereo → Depth → Pose Pipeline (Dual RGB)
 
-stereo_calib_images_rgb/
+## 0. 目标 / Ziel
 
-left_000.png / right_000.png
-
-stereo_calib_rgb.npz（核心文件）
-
-左右相机内参 K_left / K_right
-
-畸变参数 dist_left / dist_right
-
-外参 R / T
-
-立体矫正结果 R1 / R2
-
-矫正投影矩阵 P1 / P2
-
-视差-深度矩阵 Q
+本 pipeline 使用 **两台 RGB 相机（Dual RGB Stereo）** 构建立体系统，通过棋盘格完成标定与立体矫正，将 **矫正后的左右 RGB 图像输入 FoundationStereo (FS)** 生成度量深度，并最终作为 **6D Pose Estimation（如 FoundationPose / SERP-6D）** 的 RGB-D 输入。
 
 DE:
-Die Datei stereo_calib_rgb.npz enthält alle relevanten Stereo-Kalibrierparameter und wird in allen Folgeschritten wiederverwendet.
+Dieses Pipeline nutzt **zwei RGB-Kameras** zur Stereo-Rekonstruktion, führt eine vollständige Kalibrierung und Rektifizierung durch und verwendet **FoundationStereo (FS)** zur Tiefenschätzung. Die resultierenden RGB-D Daten sind konsistent und für **6D-Posenschätzung** geeignet.
 
-1.2 运行阶段输出（runtime）
+---
 
-由 capture_rectified_for_fs_bilingual.py 生成：
+## 1. 输出文件概览 / Output Übersicht
 
-shared_fs_test/
+### 1.1 标定阶段输出（offline）
 
-left_rect.png
+由 `save_calib_images_dual_rgb_bilingual.py` 与
+`stereo_calibrate_rgb_bilingual.py` 生成：
 
-right_rect.png
+* `stereo_calib_images_rgb/`
 
-（调试用）
+  * `left_000.png / right_000.png`
+* `stereo_calib_rgb.npz`（**核心文件**）
 
-fs_dual_rgb_debug/left_raw.png
+  * 左右相机内参 `K_left / K_right`
+  * 畸变参数 `dist_left / dist_right`
+  * 外参 `R / T`
+  * 立体矫正结果 `R1 / R2`
+  * 矫正投影矩阵 `P1 / P2`
+  * 视差-深度矩阵 `Q`
 
-fs_dual_rgb_debug/right_raw.png
+DE:
+Die Datei `stereo_calib_rgb.npz` enthält **alle relevanten Stereo-Kalibrierparameter** und wird in allen Folgeschritten wiederverwendet.
 
-由 make_fs_intrinsic_from_npz_bilingual.py 生成：
+---
 
-K_d435_2RGB.txt
+### 1.2 运行阶段输出（runtime）
 
-rectified 内参 K（3×3，展开）
+由 `capture_rectified_for_fs_bilingual.py` 生成：
 
-baseline（单位：米）
+* `shared_fs_test/`
 
-1.3 FoundationStereo 输出
+  * `left_rect.png`
+  * `right_rect.png`
+* （调试用）
+
+  * `fs_dual_rgb_debug/left_raw.png`
+  * `fs_dual_rgb_debug/right_raw.png`
+
+由 `make_fs_intrinsic_from_npz_bilingual.py` 生成：
+
+* `K_d435_2RGB.txt`
+
+  * rectified 内参 K（3×3，展开）
+  * baseline（单位：米）
+
+---
+
+### 1.3 FoundationStereo 输出
 
 由 FoundationStereo 官方脚本生成：
 
-depth_meter.npy
+* `depth_meter.npy`
 
-FS 输出深度
+  * FS 输出深度
+  * 分辨率：**rectified RGB**
+  * 单位：**米**
 
-分辨率：rectified RGB
+---
 
-单位：米
+## 2. 推荐用于 Pose 的输入组合 / Empfohlene Pose Inputs
 
-2. 推荐用于 Pose 的输入组合 / Empfohlene Pose Inputs
+✅ **推荐（强烈）：**
 
-✅ 推荐（强烈）：
-
-RGB: left_rect.png
-
-Depth: depth_meter.npy → 转换为 16-bit PNG（mm）
-
-K: K_d435_2RGB.txt
+* **RGB**: `left_rect.png`
+* **Depth**: `depth_meter.npy` → 转换为 16-bit PNG（mm）
+* **K**: `K_d435_2RGB.txt`
 
 DE:
-RGB、Depth 和 Intrinsics 必须来自同一个 rectified 坐标系，否则会直接导致 6D Pose 漂移。
+RGB、Depth 和 Intrinsics **必须来自同一个 rectified 坐标系**，否则会直接导致 6D Pose 漂移。
 
-下面给你两块内容：
+⚠ **不推荐：**
 
-1. **RGB 线路的目录结构图**（和你 IR 那种风格一致）
-2. **程序运行顺序图**（含你写的那几条命令 + 我补齐 FS 推理这一步）
+* raw RGB + rectified depth
+* rectified RGB + 非 rectified K
+* 使用 `||T||` 作为 baseline
 
-同时我会把你给的路径/环境写得**可直接粘贴进 README**。
+---
+
+## 3. 运行步骤 / Schritte
+
+### 3.1 采集棋盘格标定图像 / Calibration Capture
+
+```bash
+conda activate fs-pose
+python save_calib_images_dual_rgb_bilingual.py
+```
+
+说明：
+
+* 采集左右 RGB 棋盘格图像
+* 建议 **15–25 对**
+* 覆盖不同：
+
+  * 深度
+  * 旋转角度
+  * 图像位置
+
+DE:
+Mindestens 15–25 Bildpaare mit guter räumlicher Abdeckung werden empfohlen.
+
+---
+
+### 3.2 双目立体标定 / Stereo Calibration
+
+```bash
+python stereo_calibrate_rgb_bilingual.py
+```
+
+该步骤完成：
+
+1. 左右单目标定
+2. 双目标定（固定单目内参）
+3. `cv2.stereoRectify(alpha=0.5)`
+4. 保存 `stereo_calib_rgb.npz`
+
+⚠ **关键说明 / Wichtig：**
+
+* `alpha = 0.5` 是折中选择
+* 更稳定 Pose 可尝试 `alpha = 0`
+* 更完整视野可用 `alpha = -1`
+
+---
+
+### 3.3 导出 FoundationStereo 内参 / FS Intrinsics
+
+```bash
+python make_fs_intrinsic_from_npz_bilingual.py
+```
+
+内部逻辑（非常关键）：
+
+* `K = P1[:,:3]`（rectified 内参）
+* `baseline = -P2[0,3] / P2[0,0]`
+
+DE:
+Baseline wird **aus der rektifizierten Projektionsmatrix** abgeleitet, nicht aus dem Roh-T-Vektor.
+
+❌ **禁止做法：**
+
+```text
+baseline = ||T||
+```
+
+---
+
+### 3.4 运行时采集 rectified RGB / Runtime Capture
+
+```bash
+python capture_rectified_for_fs_bilingual.py
+```
+
+输出：
+
+* `left_rect.png`
+* `right_rect.png`
+
+可视化窗口中：
+
+* 左右图像应 **严格水平对齐**
+* 同一物体在左右图中 y 坐标基本一致
+
+---
+
+### 3.5 运行 FoundationStereo / Run FS
+
+```bash
+cd FoundationStereo
+conda activate foundation_stereo
+
+python scripts/run_demo.py \
+  --left_file  ./shared_fs_test/left_rect.png \
+  --right_file ./shared_fs_test/right_rect.png \
+  --ckpt_dir   ./pretrained_models/model_best_*.pth \
+  --out_dir    ./outputs_test \
+  --intrinsic_file ./assets/K_d435_2RGB.txt
+```
+
+输出：
+
+* `depth_meter.npy`（单位：米）
+
+---
+
+## 4. 深度单位说明 / Einheit der Tiefe
+
+* FS 输出：**米**
+* Pose 常用：**毫米**
+
+```python
+depth_mm = depth_m * 1000.0
+```
+
+DE:
+Falsche Einheit (mm ↔ m) führt zu **Translationsfehlern** in der Pose.
+
+---
+
+## 5. 常见问题 / Häufige Probleme
+
+### 5.1 Pose 漂移 / Pose Drift
+
+**原因：**
+
+* K / baseline / 图像不一致
+* rectified 与 raw 混用
+
+**解决：**
+
+* 始终使用：
+
+  * rectified RGB
+  * rectified K
+  * rectified baseline
+
+---
+
+### 5.2 深度噪声大
+
+**可能原因：**
+
+* 双 RGB **无硬件同步**
+* 自动曝光 / 白平衡不一致
+* 光照变化大
+
+**建议：**
+
+* 静态场景评估
+* 尽量关闭自动曝光
+* 用 IR pipeline 作为对照
+
+---
+
+### 5.3 深度尺度错误
+
+**典型症状：**
+
+* 深度“形状对”
+* 但 Pose 平移发散
+
+👉 **99% 是 baseline 算错**
+
+---
+
+## 6. 关于环境与路径说明 / Environments & Paths
+
+✅ **推荐写在 README 里（但保持简洁）**
+
+示例：
+
+```bash
+conda activate fs-pose          # 标定 / rectification
+conda activate foundation_stereo # FoundationStereo
+```
+
+⚠ 不要在 README 中硬编码绝对路径
+⚠ 脚本内部可假设 `shared_fs_test/`
+
+---
+
+## 7. 总结 / Zusammenfassung
+
+**中文：**
+该 Dual-RGB pipeline 在几何上是严格正确的，但对 **标定质量、同步性和参数一致性** 非常敏感。
+在 rectified 图像 + 正确 baseline 的前提下，FoundationStereo 可生成可用于 6D Pose 的深度。
+
+**Deutsch:**
+Die Dual-RGB-Pipeline ist geometrisch korrekt, jedoch sensitiv gegenüber Inkonsistenzen.
+Bei konsistenter Rektifizierung und korrekter Baseline liefert FoundationStereo brauchbare Tiefen für 6D-Posenschätzung.
+
+---
+
+如果你愿意，**下一步我可以继续帮你做 3 件“论文级别加分”的事**之一：
+
+1. 🔁 **把 IR + RGB 两条 pipeline 合并成一个总 README（对照表形式）**
+2. 🧩 写一段 **论文方法章节（RGB vs IR Stereo 对比）**
+3. 📊 帮你整理 **“为什么 RGB Stereo 比 IR 更不稳定”的实验分析段**
+
+你直接说一句：
+👉「合并 IR + RGB README」 or 「写论文方法段」即可。
+
 
 ---
 
