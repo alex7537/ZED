@@ -7,3 +7,38 @@ cp /home/match/ZED/zed_capture/left_000004.png /home/match/FS/FoundationStereo/s
 cp /home/match/ZED/zed_capture/right_000004.png /home/match/FS/FoundationStereo/shared_fs_test/
 
 python scripts/run_demo.py --left_file ./shared_fs_test/left_000004.png --right_file ./shared_fs_test/right_000004.png --ckpt_dir ./pretrained_models/model_best_bp2.pth --out_dir ./outputs_test --intrinsic_file ./shared_fs_test/K_rgb_fs.txt
+
+# ZED → FoundationStereo → Depth → Pose Pipeline
+
+本目录用于 **ZED 双目 RGB 相机** 的数据采集、深度生成与对比分析，
+并将结果用于 **FoundationStereo (FS)** 以及后续 **6D Pose**（如 FoundationPose / SERP-6D）。
+
+Dieses Verzeichnis enthält die komplette Pipeline für die **ZED Stereo-RGB Kamera**:
+Aufnahme → Tiefenberechnung → Vergleich → Nutzung für 6D-Pose-Schätzung.
+
+---
+
+## 1. 目录结构 / Verzeichnisstruktur
+
+```text
+ZED/
+├── zed-rgb.py            # ZED 左右 RGB 采集脚本
+├── zed_capture/          # 保存 ZED 采集结果（左右图、内参）
+│   ├── left_xxxxxx.png
+│   ├── right_xxxxxx.png
+│   └── K_rgb_fs.txt      # 提供给 FoundationStereo 的内参文件
+│
+├── npy_png/              # depth: .npy ↔ .png 转换
+│   └── npy_png.py
+│
+├── depth_compare.py      # 深度结果对比（FS vs ZED 原生）
+├── depth_compare/        # 对比结果输出（图像/统计）
+│
+├── depth_uberprufen.py   # 深度数值/尺度检查
+├── compare-abstand/      # 距离（Abstand）对比实验
+│
+├── test---pose/          # 6D Pose 测试相关代码
+├── 对齐检测/             # RGB / Depth / Pose 对齐检查
+│
+├── zed.txt               # 实验或调试记录
+└── README.md             # 本说明文件

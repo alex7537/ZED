@@ -1,0 +1,26 @@
+import cv2
+import numpy as np
+
+# depth: H×W, float32, 单位 m
+depth = np.load("depth.npy")   # 或者你自己的 depth
+
+# 去除无效值（可选但推荐）
+depth_vis = depth.copy()
+depth_vis[depth_vis <= 0] = np.nan
+
+# 归一化到 0–255
+depth_norm = cv2.normalize(
+    depth_vis,
+    None,
+    alpha=0,
+    beta=255,
+    norm_type=cv2.NORM_MINMAX
+)
+
+depth_norm = depth_norm.astype(np.uint8)
+
+# 伪彩色映射
+depth_color = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
+
+cv2.imshow("Depth Color", depth_color)
+cv2.waitKey(0)

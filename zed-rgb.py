@@ -7,7 +7,7 @@ def main(
     out_dir="zed_capture",
     num_frames=5,
     fps=15,
-    resolution="HD2K",
+    resolution="HD720",
     WARMUP_FRAMES=30
 ):
     os.makedirs(out_dir, exist_ok=True)
@@ -120,7 +120,7 @@ if __name__ == "__main__":
         out_dir="zed_capture",
         num_frames=5,
         fps=15,
-        resolution="HD2K",
+        resolution="HD720",
         WARMUP_FRAMES=30
     )   
 

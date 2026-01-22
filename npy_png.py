@@ -1,12 +1,8 @@
 import numpy as np
-import cv2
+import imageio.v2 as imageio
 
-# 读入 FS / ZED 深度（单位：米）
-depth_m = np.load("/home/match/ZED/npy_png/depth_meter.npy")   # shape: H x W
+d = np.load("/home/match/ZED/npy_png/depth_meter.npy").astype(np.float32)
+d16 = np.clip(d * 1000.0, 0, 65535).astype(np.uint16)
 
-# 米 → 毫米
-depth_mm = (depth_m * 1000.0).astype(np.uint16)
-
-# 保存为 16-bit PNG
-cv2.imwrite("depth.png", depth_mm)
-
+imageio.imwrite("depth.png", d16)
+print("saved depth.png", d16.dtype, d16.shape)
