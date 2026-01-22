@@ -124,5 +124,184 @@ RGB, Depth und K müssen **im gleichen Pixel-Koordinatensystem** liegen, sonst k
 
 ---
 
+RGB → FoundationStereo → Depth → Pose Pipeline (Dual RGB)
+0. 目标 / Ziel
+
+本 pipeline 使用 两台 RGB 相机（Dual RGB Stereo） 构建立体系统，通过棋盘格完成标定与立体矫正，将 矫正后的左右 RGB 图像输入 FoundationStereo (FS) 生成度量深度，并最终作为 6D Pose Estimation（如 FoundationPose / SERP-6D） 的 RGB-D 输入。
+
+DE:
+Dieses Pipeline nutzt zwei RGB-Kameras zur Stereo-Rekonstruktion, führt eine vollständige Kalibrierung und Rektifizierung durch und verwendet FoundationStereo (FS) zur Tiefenschätzung. Die resultierenden RGB-D Daten sind konsistent und für 6D-Posenschätzung geeignet.
+
+1. 输出文件概览 / Output Übersicht
+1.1 标定阶段输出（offline）
+
+由 save_calib_images_dual_rgb_bilingual.py 与
+stereo_calibrate_rgb_bilingual.py 生成：
+
+stereo_calib_images_rgb/
+
+left_000.png / right_000.png
+
+stereo_calib_rgb.npz（核心文件）
+
+左右相机内参 K_left / K_right
+
+畸变参数 dist_left / dist_right
+
+外参 R / T
+
+立体矫正结果 R1 / R2
+
+矫正投影矩阵 P1 / P2
+
+视差-深度矩阵 Q
+
+DE:
+Die Datei stereo_calib_rgb.npz enthält alle relevanten Stereo-Kalibrierparameter und wird in allen Folgeschritten wiederverwendet.
+
+1.2 运行阶段输出（runtime）
+
+由 capture_rectified_for_fs_bilingual.py 生成：
+
+shared_fs_test/
+
+left_rect.png
+
+right_rect.png
+
+（调试用）
+
+fs_dual_rgb_debug/left_raw.png
+
+fs_dual_rgb_debug/right_raw.png
+
+由 make_fs_intrinsic_from_npz_bilingual.py 生成：
+
+K_d435_2RGB.txt
+
+rectified 内参 K（3×3，展开）
+
+baseline（单位：米）
+
+1.3 FoundationStereo 输出
+
+由 FoundationStereo 官方脚本生成：
+
+depth_meter.npy
+
+FS 输出深度
+
+分辨率：rectified RGB
+
+单位：米
+
+2. 推荐用于 Pose 的输入组合 / Empfohlene Pose Inputs
+
+✅ 推荐（强烈）：
+
+RGB: left_rect.png
+
+Depth: depth_meter.npy → 转换为 16-bit PNG（mm）
+
+K: K_d435_2RGB.txt
+
+DE:
+RGB、Depth 和 Intrinsics 必须来自同一个 rectified 坐标系，否则会直接导致 6D Pose 漂移。
+
+下面给你两块内容：
+
+1. **RGB 线路的目录结构图**（和你 IR 那种风格一致）
+2. **程序运行顺序图**（含你写的那几条命令 + 我补齐 FS 推理这一步）
+
+同时我会把你给的路径/环境写得**可直接粘贴进 README**。
+
+---
+
+## RGB Pipeline Repo Structure
+
+```text
+.
+├── save_calib_images_dual_rgb.py
+│   └─ Capture chessboard pairs (Dual RGB) → stereo_calib_images_rgb/
+│
+├── stereo_calibrate_rgb.py
+│   └─ Mono + Stereo calibration + stereoRectify → stereo_calib_rgb.npz
+│
+├── make_fs_intrinsic_from_npz.py
+│   └─ Export rectified K + baseline (from P1/P2) → assets/K_d435.txt
+│
+├── capture_rectified_for_fs.py
+│   └─ Runtime capture + undistort/rectify → shared_fs_test/left_rect.png, right_rect.png
+│
+├── FoundationStereo/
+│   └─ scripts/run_demo.py
+│      └─ Rectified RGB stereo → depth_meter.npy
+│
+├── assets/
+│   └── K_d435.txt
+│
+└── shared_fs_test/
+    ├── left_rect.png
+    ├── right_rect.png
+    ├── depth_meter.npy
+    └── (optional) debug/
+        ├── left_raw.png
+        └── right_raw.png
+```
+
+> 注：`assets/K_d435.txt` 的内容应来自 rectified 的 `P1/P2`（不要用 `||T||`）。这点在你的 `make_fs_intrinsic_from_npz*.py` 逻辑里就是这么做的。
+
+---
+
+## Program Run Order (Flow)
+
+### A) 一次性准备（标定阶段 / offline）
+
+```text
+(1) 拍棋盘格数据 15–25 组
+    python save_calib_images_dual_rgb.py
+        ↓
+    stereo_calib_images_rgb/left_*.png, right_*.png
+
+(2) 立体标定 + 立体矫正
+    python stereo_calibrate_rgb.py
+        ↓
+    stereo_calib_rgb.npz
+
+(3) 生成 FS 内参（rectified K + baseline）
+    python make_fs_intrinsic_from_npz.py
+        ↓
+    assets/K_d435.txt
+```
+
+---
+
+### B) 每次测试 FS（运行阶段 / runtime）
+
+你给的命令我按“可直接贴 README”的形式整理如下，并把 FS 推理补齐：
+
+```bash
+# 进入你的 RGB pipeline 工程目录
+cd /home/match/foundationstereo-industrial-6dpose/RGB-pipeline
+
+# 1) 采集并输出 rectified 左右图（给 FS 用）
+conda activate foundationpose
+python capture_rectified_for_fs.py
+# 输出: shared_fs_test/left_rect.png, shared_fs_test/right_rect.png
+
+# 2) 跑 FoundationStereo 得到深度
+cd FoundationStereo
+conda activate foundation_stereo
+
+python scripts/run_demo.py \
+  --left_file  ../shared_fs_test/left_rect.png \
+  --right_file ../shared_fs_test/right_rect.png \
+  --ckpt_dir   ./pretrained_models/model_best_*.pth \
+  --out_dir    ./outputs_test \
+  --intrinsic_file ../assets/K_d435.txt
+
+# 输出: (通常会在 out_dir 或 shared_fs_test 生成/复制) depth_meter.npy
+```
+
 
 
