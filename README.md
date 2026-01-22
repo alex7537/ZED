@@ -42,3 +42,87 @@ ZED/
 │
 ├── zed.txt               # 实验或调试记录
 └── README.md             # 本说明文件
+
+
+
+
+# IR → FoundationStereo → Depth → Pose Pipeline (RealSense)
+
+## Overview
+
+This repository implements an **IR-based stereo depth pipeline** using **FoundationStereo** and **Intel RealSense**, and converts the resulting depth into **RGB-aligned depth maps** suitable for **6D object pose estimation** (e.g. FoundationPose).
+
+DE:
+Dieses Projekt implementiert eine vollständige Pipeline zur **Stereo-Tiefenschätzung mit IR-Sensoren einer RealSense-Kamera**, basierend auf **FoundationStereo**, und projiziert die berechnete Tiefe in das **RGB-Koordinatensystem**, sodass konsistente RGB-D Daten für die 6D-Posenbestimmung entstehen.
+
+---
+
+## What this pipeline does (Kurzfassung)
+
+**Input**
+
+* RealSense IR stereo images (IR-left / IR-right)
+* RealSense color image
+* Camera intrinsics & extrinsics from RealSense
+
+**Processing**
+
+1. Capture synchronized IR + Color data from RealSense
+2. Run FoundationStereo on IR stereo pair → metric depth (meters)
+3. Back-project FS depth into IR camera frame
+4. Transform IR depth into Color camera frame
+5. Project depth onto Color image plane
+6. Export RGB-aligned depth (16-bit PNG, mm)
+
+**Output**
+
+* RGB image
+* RGB-aligned depth map
+* Consistent camera intrinsics
+  → directly usable for **6D Pose estimation**
+
+DE:
+Ziel ist es, **FoundationStereo als Ersatz für native RealSense-Tiefendaten** in einer industriellen 6D-Pose-Pipeline einzusetzen.
+
+---
+
+## Repository Structure
+
+```
+.
+├── realsense_ir_capture_v2.py
+│   └─ Capture IR stereo + color + intrinsics/extrinsics
+│
+├── FoundationStereo/
+│   └─ scripts/run_demo.py
+│      └─ IR stereo → depth_meter.npy
+│
+├── fs_ir_depth_to_color_depth_v2.py
+│   └─ Project FS depth → color image plane
+│
+└── shared_fs_test/
+    ├── ir_left_0000.png
+    ├── ir_right_0000.png
+    ├── color_aligned_0000.png
+    ├── depth_fs_ir2color_aligned_0000.png
+    ├── *_intrinsics.json
+    └── *_extrinsics.json
+```
+
+---
+
+## Recommended RGB-D Output for Pose
+
+✅ **Use this combination for 6D Pose estimation**
+
+* **RGB**: `color_aligned_0000.png`
+* **Depth**: `depth_fs_ir2color_aligned_0000.png` (16-bit PNG, mm)
+* **Intrinsics**: `color_aligned_intrinsics.json`
+
+DE:
+RGB, Depth und K müssen **im gleichen Pixel-Koordinatensystem** liegen, sonst kommt es zu Pose-Drift.
+
+---
+
+
+
