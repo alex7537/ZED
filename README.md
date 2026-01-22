@@ -125,6 +125,71 @@ RGB, Depth und K müssen **im gleichen Pixel-Koordinatensystem** liegen, sonst k
 ---
 
 
+## Pipeline Flow / 流程图
+
+### High-level Flow (IR → FS → RGB-aligned Depth → Pose)
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ 1) Capture (RealSense)                                     │
+│    realsense_IR_v1.py                                      │
+│    - ir_left_0000.png / ir_right_0000.png                  │
+│    - color_aligned_0000.png                                │
+│    - color_aligned_intrinsics.json                         │
+│    - ir_intrinsics.json + ir2color_extrinsics.json         │
+└────────────────────────────────────────────────────────────┘
+                    │
+                    │  (copy / use files as FS input)
+                    ▼
+┌────────────────────────────────────────────────────────────┐
+│ 2) Depth Estimation (FoundationStereo)                     │
+│    FoundationStereo/scripts/run_demo.py                    │
+│    Input:  ir_left_0000.png + ir_right_0000.png + K_ir_fs   │
+│    Output: depth_meter.npy  (float32, meters, IR-left frame)│
+└────────────────────────────────────────────────────────────┘
+                    │
+                    │  (depth_meter.npy + captured intr/extr)
+                    ▼
+┌────────────────────────────────────────────────────────────┐
+│ 3) Projection + Fusion (IR depth → Color plane)            │
+│    IR_farben.py                                            │
+│    - Back-project depth → IR 3D points                     │
+│    - Transform IR → Color (using ir2color extrinsics)       │
+│    - Project to Color image plane (using Color intrinsics)  │
+│    Output: depth_fs_ir2color_aligned_0000.png (16-bit, mm)  │
+└────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌────────────────────────────────────────────────────────────┐
+│ 4) Pose Input (RGB-D)                                      │
+│    RGB:  color_aligned_0000.png                            │
+│    D:    depth_fs_ir2color_aligned_0000.png (mm)            │
+│    K:    color_aligned_intrinsics.json                      │
+│    → feed into FoundationPose / SERP-6D                     │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### DE: Ablaufdiagramm (Kurz)
+
+```text
+RealSense Aufnahme (IR + Color)
+  → FoundationStereo (IR-Stereo → depth_meter.npy)
+    → Projektion IR-Tiefe auf Color-Bildebene (IR_farben.py)
+      → Konsistentes RGB-D für 6D Pose (RGB + Depth + K)
+```
+
+---
+
+## What each step “means” (一句话版)
+
+* **realsense_IR_v1.py**：采集 IR 左右图 + aligned color，并保存 **IR 内参**、**Color 内参**、**IR→Color 外参**（后续投影必须靠它）。
+* **FS run_demo.py**：用 IR stereo 生成 **depth_meter.npy（米，IR-left 坐标系）**。
+* **IR_farben.py**：把 FS 深度从 IR-left 坐标系**投影到 color_aligned 平面**，输出 Pose 需要的 **16-bit depth PNG（mm）**。
+* **Pose**：最终输入一定是同一像素坐标系下的（RGB, Depth, K）。
+
+
 ---
 
 # RGB → FoundationStereo → Depth → Pose Pipeline (Dual RGB)
