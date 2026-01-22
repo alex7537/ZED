@@ -1,0 +1,107 @@
+# IR → FoundationStereo → Depth → Pose Pipeline (RealSense)
+
+## 0. 目标 / Ziel
+本 pipeline 用 RealSense 的 IR 双目图输入 FoundationStereo (FS) 生成深度，
+并把深度从 IR(left) 坐标系投影到 Color 图像平面，从而得到可用于 6D Pose 的 RGB-D 输入对。
+
+DE: Dieses Pipeline nutzt IR-Stereo von RealSense als Input für FoundationStereo (FS),
+projiziert die resultierende Tiefe von IR(left) auf die Color-Bildebene und erzeugt konsistente RGB-D Daten für 6D Pose.
+
+---
+
+## 1. 输出文件概览 / Output Übersicht
+
+采集脚本输出（realsense_ir_capture_v2.py）：
+- color_raw_0000.png                （原始 Color）
+- color_aligned_0000.png            （对齐后的 Color，推荐用于 Pose）
+- depth_aligned_0000.png            （RealSense 原生 depth，对齐到 color，用于对照）
+- ir_left_0000.png / ir_right_0000.png （IR 灰度转 3 通道）
+- ir_left_intrinsics.json           （IR-left 内参 + 畸变参数 + baseline）
+- color_raw_intrinsics.json         （Color(raw) 内参 + 畸变）
+- color_aligned_intrinsics.json     （Color(aligned) 内参 + 畸变）
+- ir2color_raw_extrinsics.json      （IR(left) -> Color(raw) 外参）
+- ir2color_aligned_extrinsics.json  （IR(left) -> Color(aligned) 外参）
+- cloud_rs_aligned.ply              （RealSense 原生点云，用于 sanity check）
+
+DE: Der Capture-Schritt speichert sowohl raw als auch aligned Color und alle benötigten Intrinsics/Extrinsics.
+
+投影脚本输出（fs_ir_depth_to_color_depth_v2.py）：
+- depth_fs_ir2color_raw_0000.png        （FS 深度投影到 raw color 平面）
+- depth_fs_ir2color_aligned_0000.png    （FS 深度投影到 aligned color 平面，推荐用于 Pose）
+- cloud_fs_ir2color_raw_colored.ply
+- cloud_fs_ir2color_aligned_colored.ply
+
+DE: Die Projektion erzeugt eine RGB-ausgerichtete Tiefenkarte (16-bit, mm) und farbige Punktwolken.
+
+---
+
+## 2. 推荐用于 Pose 的输入组合 / Empfohlene Pose Inputs
+
+✅ 推荐（强烈）：
+- RGB:  color_aligned_0000.png
+- Depth: depth_fs_ir2color_aligned_0000.png   (16-bit PNG, Einheit: Millimeter)
+- K:    color_aligned_intrinsics.json
+
+DE: Für Pose unbedingt die aligned-Variante nutzen, damit RGB/Depth/K im gleichen Pixel-Koordinatensystem sind.
+
+⚠️ 不推荐混用：
+- 不要使用 color_raw + depth_fs_ir2color_aligned（像素坐标系可能存在微小不一致）
+- 不要使用 color_aligned + depth_fs_ir2color_raw
+
+DE: Nicht mischen: raw RGB mit aligned Depth (oder umgekehrt) kann zu Pose-Drift führen.
+
+---
+
+## 3. 运行步骤 / Schritte
+
+### 3.1 采集数据 / Capture
+```bash
+conda activate fs-pose   # 你的新环境名
+python realsense_ir_capture_v2.py
+
+-------------------
+3.2 运行 FoundationStereo / Run FS
+
+示例（以你的模型和路径为准）：
+
+cd FoundationStereo
+python scripts/run_demo.py \
+  --left_file  ./shared_fs_test/ir_left_0000.png \
+  --right_file ./shared_fs_test/ir_right_0000.png \
+  --ckpt_dir   ./pretrained_models/model_best_*.pth \
+  --out_dir    ./outputs_test \
+  --intrinsic_file ./shared_fs_test/K_ir_fs.txt
+
+注意：FS 输出 depth_meter.npy 需要放到 shared_fs_test/ 下，供投影脚本使用。
+
+DE: FS erzeugt depth_meter.npy (Tiefe in Metern) und wird danach auf Color projiziert.
+3.3 投影 FS 深度到 Color 平面 / Project FS depth to Color
+
+python fs_ir_depth_to_color_depth_v2.py
+
+4. 深度单位说明 / Einheit der Tiefe
+
+    depth_fs_ir2color_aligned_0000.png 为 16-bit PNG，单位是 mm
+
+    如果 Pose 模型内部使用米（m），需要除以 1000.0
+
+DE: Die exportierte Depth-PNG ist in Millimeter (mm). Bei Bedarf in Meter umrechnen.
+5. 常见问题 / Häufige Probleme
+
+    Pose 漂移/不稳定
+
+    多数原因：RGB / Depth / K 不在同一坐标系
+
+    解决：使用“推荐 Pose 输入组合”（aligned 三件套）
+
+DE: Pose-Drift kommt meistens von inkonsistenten RGB/Depth/K.
+
+    深度噪声导致初始化失败
+
+    FS 深度条纹/孔洞较多时，建议在 Pose 前做 hole filling / bilateral filter
+    DE: Bei starkem Tiefenrauschen sind Filter (hole filling, bilateral) sinnvoll.
+
+    尺度错误（平移发散）
+
+    确认 Pose 期望单位（mm vs m）
+    DE: Einheit prüfen (mm vs m), sonst skaliert die Translation falsch.
